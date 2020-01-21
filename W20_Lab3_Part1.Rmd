@@ -1,0 +1,132 @@
+---
+title: 'Lab 3: Part 1'
+author: "Kristi Gdanetz MacCready"
+date: "12/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/UMBio201/Lab3/")
+```
+
+# Load packages
+```{r Load packages, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+library(tidyverse)
+library(readxl)
+library(broom)
+library(cowplot)
+set.seed(7)
+```
+
+# Introduction
+
+This week we are going to begin our statistics module. We will walk through a series of basic statistical tests (basic in the sense that everyone should understand when to use and how to interpret these tests) that should get you pretty far along in terms of analyses. The tests you will learn the next two weeks will allow you to analyze the following types of data:
+
+* one continuous and one categorical variable
+* one continuous and multiple categorical variables 
+* two continuous variables 
+* two categorical variables 
+
+Before you conduct any statistical tests, you should always go through the process of assumption checking. The essential point in regards to assumption checking is when assumptions are met we know we have a certain level of power (power is the likelihood of a false positive result) in the results of our test. Ideally you have met assumptions, have an appropriate number of samples, and are using the proper test to have a low likelihood of false positives. If you use a test when assumptions are violated, it reduces your power, which may mean a positive result is not real. 
+
+# Relationship between data structure and results
+
+There are several factors of data sets which influence the results of statistical tests: 
+
+* Values: numeric values of each data point
+* Sample size (n): number of data points in each group being compared 
+* Variance: spread of the data within each group
+* Effect size: size of the difference in mean, strength of the correlation, etc. 
+
+Before getting into the details of use and interpretation of formal statistical tests, we are going to do an exercise with random number vectors to illustrate how each of these factors effects your intuitive interpretation of the results. 
+
+Run the code blocks below to create two vectors with the listed means, sample size, variation (via SD). Combine these vectors into a data frame and plot. Discuss with your neighbor, then under each plot write if you would determine the two samples to be equal, and which factors influenced your decision. 
+
+### Example 1
+```{r}
+sample1 <- rnorm(6, mean=12, sd = 1) #vector1 
+
+sample2 <- rnorm(6, mean=15, sd = 1) #vector2 
+
+df1 <- cbind(sample1, sample2) %>% #combine vectors into dataframe
+  as.data.frame() %>% 
+  gather(key = "samples", value = "numbers") %>% #make long format
+  mutate(samples = as.factor(samples)) #convert to factor for plot
+
+plot1 <- ggplot(data = df1, aes(x = samples, #plot data frame 
+                     y = numbers)) + 
+  geom_boxplot(aes(color = samples)) + #shows median & quartiles 
+  geom_jitter(aes(color = samples)) + #jitter = individual points per category 
+  theme(legend.position = "none")
+plot1 #view plot
+```
+
+### Example 2
+```{r}
+sample3 <- rnorm(6, mean=12, sd = 3) 
+sample4 <- rnorm(6, mean=15, sd = 4) 
+
+df2 <- cbind(sample3, sample4) %>% #combine vectors into dataframe
+  as.data.frame() %>% 
+  gather(key = "samples", value = "numbers") %>% #make long format
+  mutate(samples = as.factor(samples)) #convert to factor for plot
+
+plot2 <- ggplot(data = df2, aes(x = samples, #plot data frame 
+                     y = numbers)) + 
+  geom_boxplot(aes(color = samples)) + 
+  geom_jitter(aes(color = samples)) + 
+  theme(legend.position = "none")
+plot2
+```
+
+### Example 3
+```{r}
+sample5 <- rnorm(20, mean=12, sd = 1) 
+sample6 <- rnorm(20, mean=15, sd = 1) 
+
+df3 <- cbind(sample5, sample6) %>% #combine vectors into dataframe
+  as.data.frame() %>% 
+  gather(key = "samples", value = "numbers") %>% 
+  mutate(samples = as.factor(samples)) 
+
+plot3 <- ggplot(data = df3, aes(x = samples, #plot data frame 
+                     y = numbers)) + 
+  geom_boxplot(aes(color = samples)) + 
+  geom_jitter(aes(color = samples)) + 
+  theme(legend.position = "none")
+plot3
+```
+
+### Example 4
+```{r}
+sample7 <- rnorm(20, mean=12, sd = 3) 
+sample8 <- rnorm(20, mean=15, sd = 4) 
+
+df4 <- cbind(sample7, sample8) %>% #combine vectors into dataframe
+  as.data.frame() %>% 
+  gather(key = "samples", value = "numbers") %>% 
+  mutate(samples = as.factor(samples)) 
+
+plot4 <- ggplot(data = df4, aes(x = samples, #plot data frame 
+                     y = numbers)) + 
+  geom_boxplot(aes(color = samples)) + 
+  geom_jitter(aes(color = samples)) + 
+  theme(legend.position = "none")
+plot4
+```
+
+# Save plots
+Well organized R projects have a plots/figures directory within the working directory, and all plots generated during analysis are saved to this folder. Using Terminal create a new directory in your working directory named "figures". Using the cowplot function below save the plots you generated above:
+```{r}
+# combined four plots into one with multiple panels 
+combined_plots <- plot_grid(plot1, plot2, plot3, plot4, 
+                            nrow = 2 , ncol = 2)
+# this function does the saving
+save_plot(combined_plots, 
+          nrow = 2 , ncol = 2, 
+          filename = "figures/example_plots.pdf")
+```
+
+-----
+end
