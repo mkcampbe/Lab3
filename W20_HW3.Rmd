@@ -1,0 +1,106 @@
+---
+title: "Homework 3"
+author: "Kristi Gdanetz MacCready"
+date: "12/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/UMBio201/Lab3/")
+```
+
+# Load packages
+```{r Load packages, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+library(tidyverse)
+library(readxl)
+library(broom)
+library(cowplot)
+set.seed(7)
+```
+
+
+# Import data
+Import `Lab3_data.txt` and re-create the lab3_df and butyrate_long data frames from Lab 3 PArt 2, if they are not currently in your global environment. 
+```{r}
+# space to import if needed 
+```
+
+
+# Question 1
+[ 4 points total ]
+
+Repeat the process used in Lab3 Part2 conduct the paired t-test for the 1xdaily group. You can use the code already written and update variable and data frame names as needed. Remember to check the assumptions. Write your conclusions regarding after the last code block. 
+```{r}
+# check assumptions
+```
+
+```{r}
+# run test
+```
+
+Was there a difference in butyrate concentration between week1 and week3 in individuals who consumped BRMPS once a day? How do these results compare with the twice a day group; does this make sense in light of the figure you generated during Lab3? 
+
+<type conclusions here>
+
+
+# Question 2 
+[ 5 points total ]
+
+Use Lab3_data.txt file to determine if there was a change in acetate concentrations for participants who consumed BRMPS 2xdaily. Remember to subset the data frame for quality and relevant measurements, and check all assumptions. Create a plot of the data used, save final the data frame and plot. Answer any questions listed below.
+```{r}
+# import and filter data frame 
+```
+
+What are the dimensions of the data frame?
+
+```{r}
+# acetate plot
+```
+
+Is there a visual difference in acetate concentrations?
+
+```{r}
+# check assumptions
+```
+
+Were any of the assumptions violated? Based on this, which test will you use?
+
+```{r}
+# conduct statistical test
+```
+
+What was the p-value of the test? What are your conclusions? 
+
+```{r}
+# save final data frame
+# save plot
+```
+
+
+# Question 3
+
+[ 5 points total ]
+
+Does breath hydrogen (H2) increase during week3 in individuals who consumed BRMPS? Start by importing the Lab3_breath.txt file, decide how you will subset the data (hint: may need to use some functions learned last week), create a plot, check assumptions, and conduct the statistical test. Write your conclusions at the end of your code, using the plot and statistical results to support your answer. Save the final data frame and plot. 
+```{r}
+# code block for import and subsetting
+```
+
+```{r}
+# code block for plot
+```
+
+```{r}
+# code block for assumptions and test
+```
+
+```{r}
+# code block for export and save 
+```
+
+< Did breath hydrogen increase? write conclusions here > 
+
+
+-----
+end
