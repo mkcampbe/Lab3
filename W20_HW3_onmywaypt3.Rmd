@@ -1,0 +1,301 @@
+---
+title: "Homework 3"
+author: "Mary Kate Campbell"
+date: "01/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/UMBio201/Lab3/")
+```
+
+# Load packages
+```{r Load packages, eval=TRUE, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+library(tidyverse)
+library(readxl)
+library(broom)
+library(cowplot)
+set.seed(7)
+```
+
+
+# Import data
+Import `Lab3_data.txt` and re-create the lab3_df and butyrate_long data frames from Lab 3 PArt 2, if they are not currently in your global environment. 
+```{r}
+lab3_df <- read_delim(file = "raw_date/Lab3_data.txt", 
+                      delim = "\t", escape_double = FALSE, 
+                      trim_ws = TRUE, na=c("NA"),
+                      col_names = TRUE, 
+                      col_types = cols(participant_id = col_character(),
+                                       study_week = col_character(),
+                                       semester = col_character(),
+                                       supplement_consumed = col_character(),
+                                       quantity_compliant = col_character(),
+                                       frequency = col_character(),
+                                       pH_median = col_double(),
+                                       pH_mean = col_double(),
+                                       bristol_median = col_double(),
+                                       bristol_mean = col_double(),
+                                       blood_glucose_median = col_double(),
+                                       blood_glucose_mean = col_double(),
+                                       acetate_median = col_double(),
+                                       acetate_mean = col_double(),
+                                       butyrate_median = col_double(),
+                                       butyrate_mean = col_double(),
+                                       propionate_median = col_double(),
+                                       propionate_mean = col_double())
+                      )
+
+
+```
+
+
+# Question 1
+[ 4 points total ]
+
+Repeat the process used in Lab3 Part2 conduct the paired t-test for the 1xdaily group. You can use the code already written and update variable and data frame names as needed. Remember to check the assumptions. Write your conclusions regarding after the last code block. 
+```{r}
+butyrate_long %>%
+  filter(frequency == "1xdaily", study_week == "week1" | study_week == "week3", supplement_consumed == "BRMPS") %>% 
+  ggplot(aes(x = study_week, 
+             y = butyrate_mean, 
+             color = study_week), 
+         frequency) + 
+  geom_violin() + geom_jitter() + 
+  facet_grid(~frequency) + 
+  xlab(NULL) + 
+  ylab("Butyrate (mmol/kg)") + 
+  theme(legend.position = "none")
+```
+
+```{r}
+#sample size check 
+butyrate_long %>%
+  filter(study_week == "week1" | study_week == "week3", #subset long data frame in same manner as plot
+         supplement_consumed == "BRMPS", 
+         frequency == "1xdaily") %>%  
+  group_by(frequency, study_week) %>% #set groups to what we are comparing
+  summarise(sample_size = n()) #use summarise() and n() to get counts of ppl in each group
+```
+Both sample sizes are greater than 30, so we pass our sample size check. 
+
+```{r}
+#normality check 
+wk1_1x <- butyrate_long %>%
+  filter(study_week == "week1", 
+         supplement_consumed == "BRMPS", 
+         frequency == "1xdaily") 
+shapiro.test(wk1_1x$butyrate_mean) 
+ggplot(wk1_1x, aes(x = butyrate_mean)) + geom_histogram()
+
+wk3_1x <- butyrate_long %>%
+  filter(study_week == "week3", 
+         supplement_consumed == "BRMPS", 
+         frequency == "1xdaily") 
+shapiro.test(wk3_1x$butyrate_mean) 
+ggplot(wk3_1x, aes(x = butyrate_mean)) + geom_histogram()
+```
+Both p-values are small (<0.05), so we can assume normality. 
+
+```{r}
+var.test(x = wk1_1x$butyrate_mean, 
+         y = wk3_1x$butyrate_mean, 
+         alternative = "two.sided") 
+```
+the high p-value 0.6408 which is greater than 0.05, indicates that the variances are equal. 
+
+```{r}
+# join these data frames back together
+x1_df <- inner_join(x = wk1_1x, y = wk3_1x,
+                    by = c("participant_id", "frequency", 
+                           "semester", "supplement_consumed", "quantity_compliant")) %>%
+  # update column names
+  rename(butyrate_mean_wk1 = butyrate_mean.x,
+         butyrate_mean_wk3 = butyrate_mean.y) %>%
+  select(-starts_with("study_week"))
+
+# code to run PAIRED t-test 
+t.test(x = x1_df$butyrate_mean_wk1, 
+       y = x1_df$butyrate_mean_wk3, 
+       var.equal = TRUE, #we set this to true based on the result of var.test() above 
+       paired = TRUE, #this must be TRUE because the samples are NOT independent 
+       alternative = "two.sided") 
+
+# the paired argument is how you distinguish a paired and non-paired test
+# here the alternative argument indicates we expect the group in the x argument (week1) to be different than y (week3)
+```
+Was there a difference in butyrate concentration between week1 and week3 in individuals who consumped BRMPS once a day? How do these results compare with the twice a day group; does this make sense in light of the figure you generated during Lab3? 
+
+There was no difference in butyrate concentration between week1 and week3 in individuals who consumed BRMPS once a day because our p-value of 0.3365 is pretty high. This is different from the results we analyzed for the twice a day group. For the twice a day group we concluded there is a difference in butyrate concentration for individuals that took the supplement twice a day. This makes sense in the light of the figure we generated because the violin plots with the data for comparing the butyrate concentrations of 1x a day individuals during week 1 and week 3 were pretty similar. 
+
+
+# Question 2 
+[ 5 points total ]
+
+Use Lab3_data.txt file to determine if there was a change in acetate concentrations for participants who consumed BRMPS 2xdaily. Remember to subset the data frame for quality and relevant measurements, and check all assumptions. Create a plot of the data used, save final the data frame and plot. Answer any questions listed below.
+```{r}
+lab3_df <- read_delim(file = "raw_date/Lab3_data.txt", 
+                      delim = "\t", escape_double = FALSE, 
+                      trim_ws = TRUE, na=c("NA"),
+                      col_names = TRUE, 
+                      col_types = cols(participant_id = col_character(),
+                                       study_week = col_character(),
+                                       semester = col_character(),
+                                       supplement_consumed = col_character(),
+                                       quantity_compliant = col_character(),
+                                       frequency = col_character(),
+                                       pH_median = col_double(),
+                                       pH_mean = col_double(),
+                                       bristol_median = col_double(),
+                                       bristol_mean = col_double(),
+                                       blood_glucose_median = col_double(),
+                                       blood_glucose_mean = col_double(),
+                                       acetate_median = col_double(),
+                                       acetate_mean = col_double(),
+                                       butyrate_median = col_double(),
+                                       butyrate_mean = col_double(),
+                                       propionate_median = col_double(),
+                                       propionate_mean = col_double())
+                      )
+acetate_df <- lab3_df %>% 
+    
+  select(-starts_with("but"), -starts_with("pro"), 
+         -starts_with("pH"), -starts_with("bristol"), 
+         -starts_with("blood"), -ends_with("median")) %>%
+  filter(semester != "Winter2015",
+         supplement_consumed == "BRMPS",
+         quantity_compliant == "yes", 
+         study_week == "week3" | study_week == "week1",
+         frequency == "2xdaily") %>%
+  drop_na(acetate_mean) #drop any samples with NA in named columns
+
+dim(acetate_df)
+``` 
+
+
+What are the dimensions of the data frame?
+The dimensions of the acetate df are 133 rows by 7 columns 
+
+```{r}
+acetate_plot <- acetate_df %>%
+  ggplot(aes(x = study_week, 
+             y = acetate_mean,
+            color = study_week)) + 
+  geom_violin() + geom_jitter()
+```
+
+Is there a visual difference in acetate concentrations?
+There are appear to be no visual differences in acetate concentrations. The widest part of week1 violin plot is slightly wider than the widest part of week3 violin plot but the variation in data appears to be the same
+```{r}
+#sample size check 
+acetate_df %>%
+  filter(study_week == "week1" | study_week == "week3", #subset long data frame in same manner as plot
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") %>%  
+  group_by(frequency, study_week) %>% #set groups to what we are comparing
+  summarise(sample_size = n()) #use summarise() and n() to get counts of ppl in each group
+```
+```{r}
+#normality check
+wk1_2x <- acetate_df %>%
+  filter(study_week == "week1", 
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") 
+shapiro.test(wk1_2x$acetate_mean) 
+ggplot(wk1_2x, aes(x = acetate_mean)) + geom_histogram()
+
+wk3_2x <- acetate_df %>%
+  filter(study_week == "week3", 
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") 
+shapiro.test(wk3_2x$acetate_mean) 
+ggplot(wk3_2x, aes(x = acetate_mean)) + geom_histogram()
+
+```
+both p-values are small (<0.05), so can assume normality 
+```{r}
+# equal variances check 
+var.test(x = wk1_2x$acetate_mean, 
+         y = wk3_2x$acetate_mean, 
+         alternative = "two.sided") 
+```
+The p-value is 0.55 which is greater than 0.05, so can assume equal variances 
+Were any of the assumptions violated? Based on this, which test will you use?
+No none of the assumptions violated. Therefore, we are going to conduct a paired t-test. 
+```{r}
+# join these data frames back together
+final_acetate <- inner_join(x = wk1_2x, y = wk3_2x,
+                    by = c("participant_id", "frequency", 
+                           "semester", "supplement_consumed", "quantity_compliant")) %>%
+  # update column names
+  rename(acetate_mean_wk1 = acetate_mean.x,
+         acetate_mean_wk3 = acetate_mean.y) %>%
+  select(-starts_with("study_week"))
+
+# code to run PAIRED t-test 
+t.test(x = final_acetate$acetate_mean_wk1, 
+       y = final_acetate$acetate_mean_wk3, 
+       var.equal = TRUE, #we set this to true based on the result of var.test() above 
+       paired = TRUE, #this must be TRUE because the samples are NOT independent 
+       alternative = "two.sided") 
+# here the alternative argument indicates we expect the group in the x argument (week1) to be different than y (week3)
+```
+
+What was the p-value of the test? What are your conclusions? 
+My p-value was 0.01592. Since this p-value is less than 0.05, we can conclude that there is a difference in acetate concentration of participants that took BMPS 2x daily during week1 and week3. 
+```{r}
+write_delim(final_acetate, path = "curated_data/acetate_data.txt", delim = "\t")
+save_plot(acetate_plot, 
+          nrow = 1 , ncol = 1, 
+          filename = "figures/acetate_plot.pdf") # save plot
+```
+
+
+# Question 3
+
+[ 5 points total ]
+
+Does breath hydrogen (H2) increase during week3 in individuals who consumed BRMPS? Start by importing the Lab3_breath.txt file, decide how you will subset the data (hint: may need to use some functions learned last week), create a plot, check assumptions, and conduct the statistical test. Write your conclusions at the end of your code, using the plot and statistical results to support your answer. Save the final data frame and plot. 
+```{r}
+h2_df <- read_delim(file = "raw_date/Lab3_breath.txt", 
+                      delim = "\t", escape_double = FALSE, 
+                      trim_ws = TRUE, na=c("NA"),
+                      col_names = TRUE,
+                      col_types = cols(Participant_ID = col_character(),
+                                      Semester = col_character(),
+                                      Supplement_consumed = col_character(),
+                                      Quantity_compliant = col_character(),
+                                      Frequency = col_character(),
+                                      Study_week = col_character(),
+                                      Measurement_type = col_character(),
+                                      CH4_mean = col_double(),
+                                      CH4_median = col_double(),
+                                      CH4_adj_mean = col_double(),
+                                      CH4_adj_median = col_double(),
+                                      H2_mean = col_double(),
+                                      H2_median = col_double(),
+                                      CO2_mean = col_double(),
+                                      CO2_median = col_double(),
+                                      Weekly_measurements = col_double(),
+                                      Comments = col_character()
+                      ))
+```
+
+```{r}
+# code block for plot
+```
+
+```{r}
+# code block for assumptions and test
+```
+
+```{r}
+# code block for export and save 
+```
+
+< Did breath hydrogen increase? write conclusions here > 
+
+
+-----
+end
