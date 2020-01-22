@@ -1,0 +1,271 @@
+---
+title: "Lab 3: Part 2"
+author: "Mary Kate Campbell"
+date: "01/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "~/Documents/UMBio201/Lab3/")
+```
+
+# Load packages
+```{r Load packages, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+library(tidyverse)
+library(readxl)
+library(broom)
+library(cowplot)
+set.seed(7)
+```
+
+# Import data 
+
+While learning how to do statistical tests in this lab, we are also going to begin to answer the overarching question for the course, "Does consumption of a pre-biotic fiber supplement alter the gut microbiome?" Remember there are multiple layers to answering this question:
+
+* change in microbial fermentation products (SCFAs, breath gases)
+* change in environment due to production of fermentation products (pH, bristol score)
+* change in microbial community composition and/or microbial diversity 
+* correlations between fermentation products and the microbiota 
+
+The examples today will look at the change in fermentation products across study weeks (before and during supplement consumption), and between the different types of fiber supplements. Run the code below to import a curated version of the scfa data, in which weekly averages (mmol/kg SCFA) have already been calculated. 
+```{r}
+lab3_df <- read_delim(file = "raw_date/Lab3_data.txt", 
+                      delim = "\t", escape_double = FALSE, 
+                      trim_ws = TRUE, na=c("NA"),
+                      col_names = TRUE, 
+                      col_types = cols(participant_id = col_character(),
+                                       study_week = col_character(),
+                                       semester = col_character(),
+                                       supplement_consumed = col_character(),
+                                       quantity_compliant = col_character(),
+                                       frequency = col_character(),
+                                       pH_median = col_double(),
+                                       pH_mean = col_double(),
+                                       bristol_median = col_double(),
+                                       bristol_mean = col_double(),
+                                       blood_glucose_median = col_double(),
+                                       blood_glucose_mean = col_double(),
+                                       acetate_median = col_double(),
+                                       acetate_mean = col_double(),
+                                       butyrate_median = col_double(),
+                                       butyrate_mean = col_double(),
+                                       propionate_median = col_double(),
+                                       propionate_mean = col_double())
+                      )
+```
+
+# 1 continuous and 1 categorical (discrete) variable 
+
+The first statistical test we will use is to compare means of two groups, for example mean SCFA concentration before and during starch supplement. In this example, the SCFA concentration is the continuous variable (it can be any number that is biologically possible), and the study week (week1/before and week3/during) is the categorical variable. In this lesson we are going to use the term categorical, however these are called discrete on the ggplot cheatsheet. 
+
+### Violin plots
+In the section above we subset by fiber supplement and fermentation product. One of the variations of fiber supplement we tested was frequency (once or twice daily). In the code below we are going to generate a plot that illustrates the butyrate concentration when individuals are consuming fiber supplements at different frequencies. 
+
+Violin plots (or geom_boxplot + geom_jitter; or geom_jitter alone) are the recommended way to represent these families of data, they show the variation and the range, are easy to annotate with a mean (geom_errobar), you can easily add individual data points (geom_violin + geom_jitter), and do not obfuscate data like in a bar plot. We will *not* use bar plots in this course. 
+
+The code below subsets the data frame you imported above for butyrate measurements only, then subsets the supplement type for potato starch (BRMPS, which stands for Bob's Red Mill Potato Starch). Then it excludes any samples from Winter 2015 (there were methodological issues that semester), and filters for individuals who were quantity compliant. We retain the frequency and semester columns, because those will be used later. 
+```{r}
+butyrate_long <- lab3_df %>%
+  # use select to drop extra columns
+  select(-starts_with("ace"), -starts_with("pro"), 
+         -starts_with("pH"), -starts_with("bristol"), 
+         -starts_with("blood"), -ends_with("median")) %>%
+  filter(semester != "Winter2015",
+         supplement_consumed == "BRMPS" | supplement_consumed == "LOODAT",
+         quantity_compliant == "yes") %>%
+  drop_na(butyrate_mean) #drop any samples with NA in named columns
+```
+Check the dimension of the starting data frame (lab3_df) and the product data frame (butyrate_long), do you have fewer rows and columns in the product data frame? Is this the result you would expect? Try to develop a habit of these sort of sanity checks, to make sure your code is working as intended. 
+
+```{r}
+# Generate a plot of the [butyrate] of each supplement frequency, week 3 only  
+butyrate_long %>%
+  filter(study_week == "week3") %>%
+  ggplot(aes(x = frequency, 
+             y = butyrate_mean)) + 
+  geom_violin() + geom_jitter()
+
+dim(butyrate_long) #dimensions are 366 rows by 7 columns
+dim(lab3_df) #dimensions are 1477 rows by 18 columns 
+
+#there are fewer rows and columns for the product data frame(butyrate_long). This is what we would expect because we are dropped columns and selected for data only in week3.  
+```
+
+In the plots created above, notice the widest part of the twice daily (2xdaily) category appears slightly higher than once daily (1xdaily). This means most of the data points in the 2x group are of a higher concentration that those in the 1x group. However the top of the violin in the 1x group is higher than the 2x, indicating the 1x group's maximum value is greater. Discuss with your neighbor, do you think the butyrate concentrations of these two groups (1x vs. 2x) are different? 
+
+I think the butyrate concentrations of these two groups (1x vs 2x) are not different because looking at the variation of the data, they are pretty similar and the mode of the data points are within the same range of y- values. 
+
+### Checking assumptions
+In the sections above we observed trends in the data, but this is not sufficient for research purposes. Scientists use statistics to determine the probability that these trends are real phenomena. Before using a statistical test, researchers have to determine if the data are appropriate for the test of interest, otherwise they might have more confidence in the results than they should. This is accomplished by checking the assumptions of the tests. 
+
+In the violin plot above, we want to determine if the butyrate concentrations in 1xdaily potato starch consumer group is different from that of the 2xdaily potato starch consumer group. The plot indicates this might be the case. To answer this question we are comparing two means (mean of 1xdaily vs mean of 2xdaily), to do this we use the student's t-test. A t-test requires the following assumptions to be met: 
+
+* Relatively large sample size (usually > 30)
+* The samples have to come from a normal distribution
+* Equal variances in the groups being compared (this will infleunce some of the t.test() arguments)
+
+##### Sample size
+```{r}
+# subset long data frame in same manner as for plot
+butyrate_long %>%
+  filter(study_week == "week3") %>% 
+  group_by(frequency) %>% #set groups to what we are comparing
+  summarise(sample_size = n()) #use summarise() and n() to get counts of ppl in each group
+```
+both sample sizes are > 30--> our sample size criteria to use a t-test is met. 
+##### Normality 
+Normality checks need completed on each individual group being compared, here that means one group contains the butyrate measurements from week3 in individuals consuming starch once a day (1xdaily), and the second group contains the butyrate measurements from week3 in individuals consuming starch twice a day (2xdaily).
+```{r}
+# Subset data to generate the first group
+but_df_1x <- butyrate_long %>%
+  filter(study_week == "week3" & frequency == "1xdaily") 
+# normality test on group 
+shapiro.test(but_df_1x$butyrate_mean) #call column of dataframe with values = vector 
+```
+
+```{r}
+# Subset data to generate the second group
+but_df_2x <- butyrate_long %>%
+  filter(study_week == "week3" & frequency == "2xdaily") 
+#repeat normality test with second group 
+shapiro.test(but_df_2x$butyrate_mean) 
+```
+
+For shaprio.test() a small p-value indicates these samples differ from a normal distribution. When I have a result with a small p-value I always check how much the distribution deviates from normal with a histogram:
+```{r}
+# histogram for group 1
+ggplot(but_df_1x, aes(x=butyrate_mean)) +
+  geom_histogram() #histograms show the number of data points (count) at each value
+qqnorm(but_df_1x$butyrate_mean); qqline(but_df_1x$butyrate_mean)
+```
+ 
+```{r}
+# histogram for group 2
+ggplot(but_df_2x, aes(x=butyrate_mean)) +
+  geom_histogram() 
+qqnorm(but_df_2x$butyrate_mean); qqline(but_df_2x$butyrate_mean)
+```
+
+These histograms show rough bell curves, and the qqplots do not show a lot of deviation from the line; in combination with our large sample sizes we are okay with proceeding with a t-test.
+
+#### Equal variances 
+
+Finally we are going to determine if the groups we would like to compare (1xdaily and 2xdaily) have equal variances (also called homogeneity). 
+```{r}
+# Use the data frames for each group created in the section above
+var.test(x = but_df_1x$butyrate_mean, 
+         y = but_df_2x$butyrate_mean, 
+         alternative = "two.sided") 
+# the alternative argument indicates we expect the variances to be different, but do not have expectations that one is lower/higher than the other
+```
+A low p-value (< 0.05) indicates the variances are not equal, we will account for this result in our test in the next code block.  
+
+### T-test between categorical variables
+
+The test you will probably use most frequently is the t-test; and this test determines if the means of two groups are equal. First we need to extract the data we will use for the test: 
+```{r}
+# use groups extracted above for the test 
+t.test(x = but_df_1x$butyrate_mean, 
+       y = but_df_2x$butyrate_mean,
+       paired = FALSE, 
+       var.equal = TRUE, #we set this to true based on the result of var.test() above 
+       alternative = "less")
+# here the alternative argument indicates we expect the group in the x argument (1xdaily) to be less than y (2xdaily)
+```
+This small p-value (~0.005) indicates the means of the two groups are different. We can conclude the concentration of butyrate is not equal in individuals who consumed BRMPS once or twice daily. 
+
+### Paired t-test
+
+As you have learned in the Friday lectures, everyone has a unique microbiome. We can compare week 1 and week 3 mean butyrate concentrations of all individuals who consumed BRMPS, and determine if the addition of the supplement results in generally higher fecal butyrate concentrations for most individuals. This is accomplished with a special flavor of t-test called a paired t-test. Paired t-tests are used whenever the samples are not independent, such as when the samples are from the same individual over time. 
+```{r}
+# Nearly the same plot as above, but use facets to plot both weeks 
+butyrate_long %>%
+  filter(study_week == "week1" | study_week == "week3", 
+         supplement_consumed == "BRMPS") %>% 
+  ggplot(aes(x = study_week, 
+             y = butyrate_mean, 
+             color = study_week), 
+         frequency) + 
+  geom_violin() + geom_jitter() + 
+  facet_grid(~frequency) + 
+  xlab(NULL) + 
+  ylab("Butyrate (mmol/kg)") + 
+  theme(legend.position = "none")
+```
+ 
+In the figure above it appears there is no difference in between weeks for the 1xdaily group, but there may be an increase in the 2xdaily group. The examples below will focus only on the 2xdaily group. Before we conduct the statistical test to determine if the observed trends are likely true, we must check our assumptions!
+```{r}
+# sample size check 
+butyrate_long %>%
+  filter(study_week == "week1" | study_week == "week3", #subset long data frame in same manner as plot
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") %>%  
+  group_by(frequency, study_week) %>% #set groups to what we are comparing
+  summarise(sample_size = n()) #use summarise() and n() to get counts of ppl in each group
+```
+
+both sample sizes are greater than 30. therefore, we meet our sample size check. 
+```{r}
+# normality check 
+wk1_2x <- butyrate_long %>%
+  filter(study_week == "week1", 
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") 
+shapiro.test(wk1_2x$butyrate_mean) 
+ggplot(wk1_2x, aes(x = butyrate_mean)) + geom_histogram()
+
+wk3_2x <- butyrate_long %>%
+  filter(study_week == "week3", 
+         supplement_consumed == "BRMPS", 
+         frequency == "2xdaily") 
+shapiro.test(wk3_2x$butyrate_mean) 
+ggplot(wk3_2x, aes(x = butyrate_mean)) + geom_histogram()
+```
+
+The p-values are small, so we can assume normality.
+
+```{r}
+# variance check
+var.test(x = wk1_2x$butyrate_mean, 
+         y = wk3_2x$butyrate_mean, 
+         alternative = "two.sided") 
+```
+A low p-value (< 0.05) indicates the variances are not equal, we will account for the result in the test in the code chunk below.  
+
+```{r}
+# join these data frames back together
+x2_df <- inner_join(x = wk1_2x, y = wk3_2x,
+                    by = c("participant_id", "frequency", 
+                           "semester", "supplement_consumed", "quantity_compliant")) %>%
+  # update column names
+  rename(butyrate_mean_wk1 = butyrate_mean.x,
+         butyrate_mean_wk3 = butyrate_mean.y) %>%
+  select(-starts_with("study_week"))
+
+# code to run PAIRED t-test 
+t.test(x = x2_df$butyrate_mean_wk1, 
+       y = x2_df$butyrate_mean_wk3, 
+       var.equal = FALSE, #we set this to false based on the result of var.test() above 
+       paired = TRUE, #this must be TRUE because the samples are NOT independent 
+       alternative = "less") 
+
+# the paired argument is how you distinguish a paired and non-paired test
+# here the alternative argument indicates we expect the group in the x argument (week1) to be less than y (week3)
+```
+The p-value is ~0.01 which for a complex biological system (like the gut microbiome) is very low! The pattern we observed in the figure is likely a real trend. We can say with confidence that the butyrate concentrations between weeks 1 and 3 are not equal for individuals who consumed BRMPS twice daily. 
+
+### Non-parametric test
+
+What if our data does not meet any (or only a few) of the assumptions for a t-test? We just use a different test. A t-test is a parametric test, and the non-parametric counterpart is the Mann-Whitney-U test (also called a two-sample Wilcoxon test).
+```{r}
+# same arguments, just a different function call. 
+wilcox.test(x = x2_df$butyrate_mean_wk1, 
+            y = x2_df$butyrate_mean_wk3, 
+            paired = TRUE,
+            alternative = "less")
+```
+The interpretations of the p-value from this test are largely the same, small values = difference between groups. However the actual language of the null hypothesis is different; we are not testing the differences in means (actual numeric values) of the groups, we are testing the rank order of the values in each group. 
+
+-----
+end
